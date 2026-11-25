@@ -2,7 +2,7 @@
 
 A basic Employee Management System where an admin can create, view, search, filter, update and delete employee records from a responsive dashboard.
 
-**Stack:** MongoDB · Express.js · React.js (Vite) · Node.js
+**Stack:** MongoDB · Express.js · React.js (Vite) · Node.js. Frontend and backend live in **one project** with one `package.json`.
 
 ![Dashboard](screenshots/dashboard.jpg)
 
@@ -21,31 +21,35 @@ A basic Employee Management System where an admin can create, view, search, filt
 **Backend (Node + Express + Mongoose)**
 - REST API for CRUD on employees
 - Request validation (required fields, email and phone format, valid date, status enum) returning `400` with per-field errors
-- Central error handler: invalid ObjectId → `400`, not found → `404`, duplicate email → `409`, malformed JSON → `400`, unknown route → `404`
+- Central error handler: invalid ObjectId → `400`, not found → `404`, duplicate email → `409`, malformed JSON → `400`, database unavailable → `503`, unknown route → `404`
 - Server-side search and filters via query parameters
 
 ## Project Structure
 
 ```
 BMDU-task/
-├── server/                     # Express REST API
-│   ├── src/
-│   │   ├── config/db.js        # MongoDB connection (or in-memory DB)
-│   │   ├── models/Employee.js  # Mongoose schema
-│   │   ├── validators/         # Request payload validation
-│   │   ├── controllers/        # Route handlers
-│   │   ├── routes/             # /api/employees routes
-│   │   ├── middleware/         # 404 + error handler
-│   │   ├── seed.js             # Sample data
-│   │   ├── app.js              # Express app
-│   │   └── server.js           # Entry point
-│   └── scripts/smoke-test.js   # End-to-end CRUD API test
-└── client/                     # React dashboard (Vite)
-    └── src/
-        ├── api/employees.js    # API client
-        ├── components/         # Table, Form, Details, Modal, Toast
-        ├── App.jsx
-        └── index.css
+├── api/index.js              # Vercel serverless entry → backend/app.js
+├── backend/                  # Express REST API
+│   ├── config/db.js          # MongoDB connection (cached; optional in-memory DB)
+│   ├── models/Employee.js    # Mongoose schema
+│   ├── validators/           # Request payload validation
+│   ├── controllers/          # Route handlers
+│   ├── routes/               # /api/employees routes
+│   ├── middleware/           # 404 + error handler
+│   ├── seed.js               # Sample data
+│   ├── app.js                # Express app (exported)
+│   └── server.js             # Local entry point (app.listen)
+├── src/                      # React dashboard
+│   ├── api/employees.js      # API client
+│   ├── components/           # Table, Form, Details, Modal, Toast
+│   ├── App.jsx
+│   └── index.css
+├── scripts/smoke-test.js     # End-to-end CRUD API test
+├── index.html
+├── vite.config.mjs           # Dev proxy /api → http://localhost:5000
+├── vercel.json
+├── package.json
+└── .env.example
 ```
 
 ## Employee Schema
@@ -65,28 +69,50 @@ BMDU-task/
 ## Setup
 
 ### Prerequisites
-- Node.js 18+ (uses built-in `fetch`)
+- Node.js 18+
 - MongoDB running locally **or** a MongoDB Atlas connection string.
   No MongoDB? Use the in-memory option below.
 
-### 1. Backend
+### Install and run
 
 ```bash
-cd server
 npm install
 cp .env.example .env        # Windows: copy .env.example .env
-# edit MONGO_URI in .env if needed
+# edit MONGO_URI in .env
 npm run seed                # optional: insert sample employees
-npm run dev                 # http://localhost:5000
+npm run dev                 # API on :5000 + UI on http://localhost:5173
 ```
 
-**No MongoDB installed?** Run against an in-memory MongoDB (sample data is seeded automatically; data resets on restart; the first run downloads a MongoDB binary):
+**No MongoDB installed?** Run against an in-memory MongoDB (sample data is seeded automatically, data resets on restart, the first run downloads a MongoDB binary):
 
 ```bash
 npm run dev:memory
 ```
 
-`.env` variables:
+> Windows PowerShell blocking `npm` ("running scripts is disabled")? Use `npm.cmd run dev`, or run
+> `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+
+### Production build on one port
+
+```bash
+npm run build               # builds the React app into dist/
+npm start                   # Express serves dist/ and /api on http://localhost:5000
+```
+
+Useful for sharing locally with a tunnel, e.g. `ngrok http 5000`.
+
+### Scripts
+
+| Script               | What it does                                      |
+|----------------------|---------------------------------------------------|
+| `npm run dev`        | API (watch mode) + Vite dev server together       |
+| `npm run dev:memory` | Same, using the in-memory MongoDB                 |
+| `npm run build`      | Build the React app into `dist/`                  |
+| `npm start`          | Run Express (serves `dist/` if built)             |
+| `npm run seed`       | Insert sample employees if the collection is empty |
+| `npm run test:api`   | CRUD smoke test against a running API             |
+
+### Environment variables (`.env`)
 
 | Variable         | Default                                          |
 |------------------|--------------------------------------------------|
@@ -94,31 +120,32 @@ npm run dev:memory
 | `MONGO_URI`      | `mongodb://127.0.0.1:27017/employee_management`  |
 | `CLIENT_ORIGIN`  | `http://localhost:5173` (CORS, comma-separated)  |
 | `USE_MEMORY_DB`  | `false`                                          |
+| `VITE_API_URL`   | empty (UI calls `/api` on the same domain)       |
 
-### 2. Frontend
+### Test the API
 
-```bash
-cd client
-npm install
-npm run dev                 # http://localhost:5173
-```
-
-In development, Vite proxies `/api` to `http://localhost:5000`. For a production build, set `VITE_API_URL` (see `client/.env.example`) and run `npm run build`.
-
-### 3. Test the API
-
-With the server running:
+With the API running:
 
 ```bash
-cd server
 npm run test:api
 ```
 
 This runs create, duplicate-email, invalid-payload, list, search/filter, update, invalid-update, invalid-id, delete and 404 checks against the live API.
 
+## Deploy to Vercel
+
+The project deploys as a **single Vercel project**: Vite builds the UI into `dist/`, and `api/index.js` runs the Express app as a serverless function for every `/api/*` request (see [`vercel.json`](vercel.json)).
+
+1. Create a free MongoDB Atlas cluster, add a database user, and under **Network Access** allow `0.0.0.0/0` (Vercel has no fixed IPs).
+2. In Vercel, **Add New → Project**, import the repo, keep Root Directory `./`. The preset is picked up from `vercel.json` (Vite).
+3. Add the environment variable `MONGO_URI` = your Atlas connection string, e.g. `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/employee_management`.
+4. Deploy. To load sample data, put the same `MONGO_URI` in your local `.env` and run `npm run seed`.
+
+The in-memory database is for local use only and does not work on Vercel.
+
 ## API Reference
 
-Base URL: `http://localhost:5000/api`
+Base URL: `http://localhost:5000/api` (or `https://<your-app>.vercel.app/api`)
 
 | Method | Endpoint           | Description                                      |
 |--------|--------------------|--------------------------------------------------|
@@ -174,21 +201,3 @@ POST /api/employees
 | Employee Details | Mobile |
 |------------------|--------|
 | ![Details](screenshots/details.jpg) | ![Mobile](screenshots/mobile.jpg) |
-
-## Deploy to Vercel
-
-The repo deploys as one Vercel project with two [services](https://vercel.com/docs/services) (see [`vercel.json`](vercel.json)):
-
-| Service  | Folder    | Public path | What it is                                  |
-|----------|-----------|-------------|---------------------------------------------|
-| `client` | `client/` | `/*`        | React (Vite) static build                   |
-| `server` | `server/` | `/api/*`    | Express API (`src/app.js`) as a serverless function |
-
-The browser calls the API on the same domain (`/api/...`), so no CORS setup or service bindings are needed.
-
-1. Create a free MongoDB Atlas cluster, add a database user, and under **Network Access** allow `0.0.0.0/0` (Vercel has no fixed IPs).
-2. Import the GitHub repo in Vercel (**Add New → Project**) and leave the root directory as the repo root.
-3. Add the environment variable `MONGO_URI` = your Atlas connection string (e.g. `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/employee_management`).
-4. Deploy. Optionally seed sample data once from your machine: put the same `MONGO_URI` in `server/.env` and run `npm run seed`.
-
-The in-memory database (`npm run dev:memory`) is for local use only and does not work on Vercel.

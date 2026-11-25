@@ -29,8 +29,9 @@ app.get('/api/health', (req, res) => {
 app.use('/api/employees', employeeRoutes);
 
 // Serve the built React app (client/dist) so UI and API share one URL,
-// e.g. when exposing the app through ngrok. Run `npm run build` in client first.
-const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
+// e.g. when exposing the app through ngrok. Run `npm run build` first.
+// (On Vercel the static files are served by the platform, so dist is absent here.)
+const clientDist = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(path.join(clientDist, 'index.html'))) {
   app.use(express.static(clientDist));
   app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(clientDist, 'index.html')));

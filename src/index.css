@@ -100,7 +100,7 @@ input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px 
 .table tr.clickable { cursor: pointer; }
 .table tr.clickable:hover td { background: #fafbff; }
 .table th.right, .table td.right { text-align: right; }
-.actions { white-space: nowrap; }
+.actions, .table td[data-label='Phone'], .table td[data-label='Joining Date'] { white-space: nowrap; }
 .actions .btn { margin-left: 6px; }
 .emp-cell { display: flex; align-items: center; gap: 12px; }
 .emp-name { font-weight: 600; }
