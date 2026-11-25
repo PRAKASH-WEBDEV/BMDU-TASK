@@ -174,3 +174,21 @@ POST /api/employees
 | Employee Details | Mobile |
 |------------------|--------|
 | ![Details](screenshots/details.jpg) | ![Mobile](screenshots/mobile.jpg) |
+
+## Deploy to Vercel
+
+The repo deploys as one Vercel project with two [services](https://vercel.com/docs/services) (see [`vercel.json`](vercel.json)):
+
+| Service  | Folder    | Public path | What it is                                  |
+|----------|-----------|-------------|---------------------------------------------|
+| `client` | `client/` | `/*`        | React (Vite) static build                   |
+| `server` | `server/` | `/api/*`    | Express API (`src/app.js`) as a serverless function |
+
+The browser calls the API on the same domain (`/api/...`), so no CORS setup or service bindings are needed.
+
+1. Create a free MongoDB Atlas cluster, add a database user, and under **Network Access** allow `0.0.0.0/0` (Vercel has no fixed IPs).
+2. Import the GitHub repo in Vercel (**Add New → Project**) and leave the root directory as the repo root.
+3. Add the environment variable `MONGO_URI` = your Atlas connection string (e.g. `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/employee_management`).
+4. Deploy. Optionally seed sample data once from your machine: put the same `MONGO_URI` in `server/.env` and run `npm run seed`.
+
+The in-memory database (`npm run dev:memory`) is for local use only and does not work on Vercel.
